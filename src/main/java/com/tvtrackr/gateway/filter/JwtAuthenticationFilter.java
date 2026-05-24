@@ -5,7 +5,6 @@ import com.tvtrackr.gateway.constant.Headers;
 import com.tvtrackr.gateway.exception.GatewayErrors;
 import com.tvtrackr.gateway.properties.GatewayProperties;
 import com.tvtrackr.gateway.properties.JwtProperties;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.jsonwebtoken.Claims;
@@ -21,12 +20,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -113,20 +114,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       FilterChain filterChain)
       throws IOException {
     CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName);
-    try {
-      circuitBreaker.executeCheckedRunnable(() -> filterChain.doFilter(request, response));
-    } catch (CallNotPermittedException e) {
+
+    if (!circuitBreaker.tryAcquirePermission()) {
       log.warn("[CircuitBreaker] Circuit open for service={}", serviceName);
       writeError(response, GatewayErrors.SERVICE_UNAVAILABLE);
+      return;
+    }
+
+    long start = System.currentTimeMillis();
+    try {
+      filterChain.doFilter(request, response);
+      circuitBreaker.onSuccess(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS);
     } catch (Throwable e) {
+      long duration = System.currentTimeMillis() - start;
       if (e instanceof Error error) {
+        circuitBreaker.onError(duration, TimeUnit.MILLISECONDS, e);
         throw error;
       }
-      log.error(
-          "[CircuitBreaker] Error forwarding request to service={}: {}",
-          serviceName,
-          e.getMessage());
-      writeError(response, GatewayErrors.SERVICE_UNAVAILABLE);
+      if (e instanceof ResourceAccessException || e instanceof IOException) {
+        circuitBreaker.onError(duration, TimeUnit.MILLISECONDS, e);
+        log.error(
+            "[CircuitBreaker] Downstream failure for service={}: {}", serviceName, e.getMessage());
+        writeError(response, GatewayErrors.SERVICE_UNAVAILABLE);
+      } else {
+        circuitBreaker.onSuccess(duration, TimeUnit.MILLISECONDS);
+        log.error(
+            "[CircuitBreaker] Gateway-side error for service={}: {}", serviceName, e.getMessage());
+        writeError(response, GatewayErrors.SERVICE_UNAVAILABLE);
+      }
     }
   }
 
