@@ -1,0 +1,24 @@
+package com.tvtrackr.gateway.filter;
+
+import com.tvtrackr.gateway.constant.Headers;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+
+public class HeaderMutatingRequest extends HttpServletRequestWrapper {
+
+  private final String userId;
+  private final boolean emailVerified;
+
+  public HeaderMutatingRequest(HttpServletRequest request, String userId, boolean emailVerified) {
+    super(request);
+    this.userId = userId;
+    this.emailVerified = emailVerified;
+  }
+
+  @Override
+  public String getHeader(String name) {
+    if (Headers.X_USER_ID.equalsIgnoreCase(name)) return userId;
+    if (Headers.X_USER_EMAIL_VERIFIED.equalsIgnoreCase(name)) return String.valueOf(emailVerified);
+    return super.getHeader(name);
+  }
+}
