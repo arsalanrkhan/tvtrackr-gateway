@@ -57,6 +57,7 @@ services:
       JAVA_TOOL_OPTIONS: -Duser.timezone=UTC
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       AUTH_SERVICE_URL: http://auth-service:8081
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
     depends_on:
       auth-service:
         condition: service_started

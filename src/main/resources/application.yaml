@@ -17,6 +17,8 @@ server:
   port: 8080
 
 app:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL}
   jwt:
     public-key: ${JWT_PUBLIC_KEY}
   gateway:

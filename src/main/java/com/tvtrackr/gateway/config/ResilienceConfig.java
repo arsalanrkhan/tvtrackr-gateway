@@ -16,6 +16,13 @@ public class ResilienceConfig {
 
   private final ResilienceProperties resilienceProperties;
 
+  /**
+   * Circuit breakers are scoped per downstream service, not per endpoint. A single failing endpoint
+   * (e.g. /api/auth/v1/reset-password) will open the circuit for the entire service, blocking all
+   * other endpoints including healthy ones (e.g. /api/auth/v1/login). At larger scale,
+   * per-resource-group circuit breaking or infrastructure-level circuit breaking (Nginx upstream,
+   * Envoy) would provide more precise isolation Will move circuitbreaking to nginx anyway.
+   */
   @Bean
   public CircuitBreakerRegistry circuitBreakerRegistry() {
     CircuitBreakerProperties defaults = resilienceProperties.getDefaults();
