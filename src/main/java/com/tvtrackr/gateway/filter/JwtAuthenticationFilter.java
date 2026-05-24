@@ -11,6 +11,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,9 +25,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -38,7 +41,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final JwtProperties jwtProperties;
   private final CircuitBreakerRegistry circuitBreakerRegistry;
   private final ObjectMapper objectMapper;
-  private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
+  private List<PathPattern> compiledPublicRoutes;
+
+  @PostConstruct
+  public void init() {
+    PathPatternParser parser = new PathPatternParser();
+    List<String> routes = gatewayProperties.getPublicRoutes();
+    this.compiledPublicRoutes =
+        routes != null ? routes.stream().map(parser::parse).toList() : List.of();
+  }
 
   @Override
   protected void doFilterInternal(
@@ -107,6 +119,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       log.warn("[CircuitBreaker] Circuit open for service={}", serviceName);
       writeError(response, GatewayErrors.SERVICE_UNAVAILABLE);
     } catch (Throwable e) {
+      if (e instanceof Error error) {
+        throw error;
+      }
       log.error(
           "[CircuitBreaker] Error forwarding request to service={}: {}",
           serviceName,
@@ -137,9 +152,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   }
 
   private boolean isPublicRoute(String path) {
-    List<String> publicRoutes = gatewayProperties.getPublicRoutes();
-    return publicRoutes != null
-        && publicRoutes.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+    PathContainer pathContainer = PathContainer.parsePath(path);
+    return compiledPublicRoutes.stream().anyMatch(pattern -> pattern.matches(pathContainer));
   }
 
   private void writeError(HttpServletResponse response, GatewayErrors error) throws IOException {
