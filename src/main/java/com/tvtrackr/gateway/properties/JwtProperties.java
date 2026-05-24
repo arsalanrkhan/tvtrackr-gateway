@@ -10,6 +10,13 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+/**
+ * Loads the RSA public key once at startup from the JWT_PUBLIC_KEY environment variable.
+ *
+ * <p>Key rotation requires a gateway restart. The industry-standard alternative is a JWKS endpoint
+ * on auth-service (GET /api/auth/v1/.well-known/jwks.json) with periodic cache refresh — deferred
+ * as a future improvement since key rotation is not a current requirement.
+ */
 @Component
 @ConfigurationProperties(prefix = "app.jwt")
 public class JwtProperties {

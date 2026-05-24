@@ -13,17 +13,21 @@ public class HeaderMutatingRequest extends HttpServletRequestWrapper {
 
   private final String userId;
   private final boolean emailVerified;
+  private final String correlationId;
 
-  public HeaderMutatingRequest(HttpServletRequest request, String userId, boolean emailVerified) {
+  public HeaderMutatingRequest(
+      HttpServletRequest request, String userId, boolean emailVerified, String correlationId) {
     super(request);
     this.userId = userId;
     this.emailVerified = emailVerified;
+    this.correlationId = correlationId;
   }
 
   @Override
   public String getHeader(String name) {
     if (Headers.X_USER_ID.equalsIgnoreCase(name)) return userId;
     if (Headers.X_USER_EMAIL_VERIFIED.equalsIgnoreCase(name)) return String.valueOf(emailVerified);
+    if (Headers.X_CORRELATION_ID.equalsIgnoreCase(name)) return String.valueOf(correlationId);
     return super.getHeader(name);
   }
 
@@ -33,6 +37,8 @@ public class HeaderMutatingRequest extends HttpServletRequestWrapper {
       return Collections.enumeration(Collections.singletonList(userId));
     if (Headers.X_USER_EMAIL_VERIFIED.equalsIgnoreCase(name))
       return Collections.enumeration(Collections.singletonList(String.valueOf(emailVerified)));
+    if (Headers.X_CORRELATION_ID.equalsIgnoreCase(name))
+      return Collections.enumeration(Collections.singletonList(String.valueOf(correlationId)));
     return super.getHeaders(name);
   }
 
@@ -43,10 +49,12 @@ public class HeaderMutatingRequest extends HttpServletRequestWrapper {
             .filter(
                 n ->
                     !Headers.X_USER_ID.equalsIgnoreCase(n)
-                        && !Headers.X_USER_EMAIL_VERIFIED.equalsIgnoreCase(n))
+                        && !Headers.X_USER_EMAIL_VERIFIED.equalsIgnoreCase(n)
+                        && !Headers.X_CORRELATION_ID.equalsIgnoreCase(n))
             .collect(Collectors.toCollection(LinkedHashSet::new));
     names.add(Headers.X_USER_ID);
     names.add(Headers.X_USER_EMAIL_VERIFIED);
+    names.add(Headers.X_CORRELATION_ID);
     return Collections.enumeration(names);
   }
 }

@@ -1,6 +1,7 @@
 package com.tvtrackr.gateway.filter;
 
 import com.tvtrackr.common.error.ErrorResponseDTO;
+import com.tvtrackr.gateway.constant.Headers;
 import com.tvtrackr.gateway.exception.GatewayErrors;
 import com.tvtrackr.gateway.properties.GatewayProperties;
 import com.tvtrackr.gateway.properties.JwtProperties;
@@ -17,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -43,10 +45,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
 
     String path = request.getRequestURI();
+    String serviceName = resolveServiceName(path);
+    String correlationId = resolveCorrelationId(request, path, serviceName);
 
     if (isPublicRoute(path)) {
       executeWithCircuitBreaker(
-          path, new HeaderMutatingRequest(request, null, false), response, filterChain);
+          path,
+          serviceName,
+          new HeaderMutatingRequest(request, null, false, correlationId),
+          response,
+          filterChain);
       return;
     }
 
@@ -72,7 +80,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       boolean emailVerified = Boolean.TRUE.equals(claims.get("emailVerified", Boolean.class));
 
       executeWithCircuitBreaker(
-          path, new HeaderMutatingRequest(request, userId, emailVerified), response, filterChain);
+          path,
+          serviceName,
+          new HeaderMutatingRequest(request, userId, emailVerified, correlationId),
+          response,
+          filterChain);
 
     } catch (Exception e) {
       log.warn("[JwtAuthFilter] Invalid token for path={}: {}", path, e.getMessage());
@@ -82,11 +94,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private void executeWithCircuitBreaker(
       String path,
+      String serviceName,
       HttpServletRequest request,
       HttpServletResponse response,
       FilterChain filterChain)
       throws IOException {
-    String serviceName = resolveServiceName(path);
     CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName);
     try {
       circuitBreaker.executeCheckedRunnable(() -> filterChain.doFilter(request, response));
@@ -129,5 +141,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ErrorResponseDTO body =
         ErrorResponseDTO.builder().code(error.getCode()).desc(error.getDesc()).build();
     objectMapper.writeValue(response.getWriter(), body);
+  }
+
+  private String resolveCorrelationId(HttpServletRequest request, String path, String serviceName) {
+    String existing = request.getHeader(Headers.X_CORRELATION_ID);
+    String corelationId =
+        (existing != null && !existing.isBlank()) ? existing : UUID.randomUUID().toString();
+    log.debug("[Gateway] correlationId={} path={} service={}", corelationId, path, serviceName);
+    return corelationId;
   }
 }
