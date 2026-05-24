@@ -21,6 +21,9 @@ spring:
               uri: ${AUTH_SERVICE_URL}
               predicates:
                 - Path=/api/auth/v1/**
+              metadata:
+                connect-timeout: 3000
+                response-timeout: 11000
 server:
   port: 8080
 
@@ -30,6 +33,15 @@ app:
   gateway:
     public-routes:
       - /api/auth/v1/**
+    service-routes: # Configure downstream service paths here to enable resilience
+      auth-service: /api/auth/v1
+  resilience: # Default resilience config
+    defaults:
+      sliding-window-size: 10
+      failure-rate-threshold: 50
+      wait-duration-in-open-state-seconds: 30
+      permitted-calls-in-half-open-state: 3
+    # instances: only add here if you need to override defaults for a specific service
 
 logging:
   level:
