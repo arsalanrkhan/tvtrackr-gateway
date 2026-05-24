@@ -44,7 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String path = request.getRequestURI();
 
     if (isPublicRoute(path)) {
-      executeWithCircuitBreaker(path, request, response, filterChain);
+      executeWithCircuitBreaker(path, new HeaderMutatingRequest(request, null, false), response, filterChain);
       return;
     }
 
