@@ -16,6 +16,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -117,11 +118,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private String resolveServiceName(String path) {
     Map<String, String> serviceRoutes = gatewayProperties.getServiceRoutes();
     if (serviceRoutes != null) {
-      for (Map.Entry<String, String> entry : serviceRoutes.entrySet()) {
-        if (path.startsWith(entry.getValue())) {
-          return entry.getKey();
-        }
-      }
+      return serviceRoutes.entrySet().stream()
+          .filter(e -> path.startsWith(e.getValue()))
+          .max(Comparator.comparingInt(e -> e.getValue().length()))
+          .map(Map.Entry::getKey)
+          .orElseGet(
+              () -> {
+                log.warn(
+                    "[CircuitBreaker] No service mapping found for path={}, using default circuit breaker",
+                    path);
+                return "default";
+              });
     }
     log.warn(
         "[CircuitBreaker] No service mapping found for path={}, using default circuit breaker",
