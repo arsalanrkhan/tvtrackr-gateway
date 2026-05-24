@@ -1,17 +1,6 @@
 spring:
   application:
     name: gateway
-  data:
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
-      password: ${REDIS_PASSWORD}
-      lettuce:
-        pool:
-          max-active: ${REDIS_POOL_MAX_ACTIVE:10}
-          max-idle: ${REDIS_POOL_MAX_IDLE:5}
-          min-idle: ${REDIS_POOL_MIN_IDLE:2}
-          max-wait: ${REDIS_POOL_MAX_WAIT:1000ms}
   cloud:
     gateway:
       server:
