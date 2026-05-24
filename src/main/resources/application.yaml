@@ -14,12 +14,13 @@ spring:
           max-wait: ${REDIS_POOL_MAX_WAIT:1000ms}
   cloud:
     gateway:
-      mvc:
-        routes:
-          - id: auth-service
-            uri: ${AUTH_SERVICE_URL}
-            predicates:
-              - Path=/api/auth/v1/**
+      server:
+        webmvc:
+          routes:
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URL}
+              predicates:
+                - Path=/api/auth/v1/**
 server:
   port: 8080
 
