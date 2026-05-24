@@ -8,6 +8,7 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -44,7 +45,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String path = request.getRequestURI();
 
     if (isPublicRoute(path)) {
-      executeWithCircuitBreaker(path, new HeaderMutatingRequest(request, null, false), response, filterChain);
+      executeWithCircuitBreaker(
+          path, new HeaderMutatingRequest(request, null, false), response, filterChain);
       return;
     }
 
@@ -64,6 +66,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
               .getPayload();
 
       String userId = claims.getSubject();
+      if (userId == null) {
+        throw new JwtException("Missing sub claim");
+      }
       boolean emailVerified = Boolean.TRUE.equals(claims.get("emailVerified", Boolean.class));
 
       executeWithCircuitBreaker(
@@ -71,7 +76,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     } catch (Exception e) {
       log.warn("[JwtAuthFilter] Invalid token for path={}: {}", path, e.getMessage());
-      writeError(response, GatewayErrors.UNAUTHORIZED);
+      writeError(response, GatewayErrors.INVALID_TOKEN);
     }
   }
 
